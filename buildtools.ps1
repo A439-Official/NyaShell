@@ -3,11 +3,12 @@ tovenv
 
 $builddir = "./tools"
 
-if (-not (Test-Path $builddir)) {
-    mkdir $builddir
+if (Test-Path $builddir) {
+    Remove-Item -LiteralPath $builddir -Recurse -Force
 }
+mkdir $builddir
 
 
-g++ -O2 -std=c++17 -o $builddir/get_colors.exe ./tools/get_colors.cpp
+g++ -O2 -std=c++17 -o $builddir/get_colors.exe ./toolssrc/get_colors.cpp
 
-nuitka --remove-output --standalone --onefile ./tools/load_image.py --output-dir=$builddir
+nuitka --remove-output --standalone --onefile ./toolssrc/show_image.py --output-dir=$builddir

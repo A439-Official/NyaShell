@@ -84,11 +84,17 @@ function Out-Default {
 
 function prompt {
     $path = $PWD.Path
-    $homePath = [Environment]::GetFolderPath("UserProfile")
+    $homePath = if ($isWin) {
+        [Environment]::GetFolderPath("UserProfile")
+    }
+    else {
+        [Environment]::GetEnvironmentVariable("HOME")
+    }
+    $separator = [IO.Path]::DirectorySeparatorChar
     if ($path -eq $homePath) {
         $path = "~"
     }
-    elseif ($path.StartsWith($homePath + "\")) {
+    elseif ($path.StartsWith($homePath + $separator)) {
         $path = "~" + $path.Substring($homePath.Length)
     }
     (Format-Text "Nya" $NyaColors._1) + " $path> "

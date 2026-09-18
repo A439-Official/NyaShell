@@ -150,66 +150,22 @@ function nyafetch {
         "IP: $ip"
     )
 
-    if ($fetchType -eq 0) {
-        $imgW = 32
-        $imgH = 16
+    $imgW = 32
+    $imgH = 16
 
-        $defaultImg = Join-Path (Join-Path $NyaDir "res") "137508504_p0_cut.png"
-        $imgPath = if ($fetchPic -ne "" -and (Test-Path $fetchPic)) { $fetchPic } else { $defaultImg }
+    $defaultImg = Join-Path (Join-Path $NyaDir "res") "137508504_p0_cut.png"
+    $imgPath = if ($fetchPic -ne "" -and (Test-Path $fetchPic)) { $fetchPic } else { $defaultImg }
 
-        Show-Image $imgPath $imgW $imgH
-        Write-Host "$([char]27)[$($imgH)A" -NoNewline
-        $messages | ForEach-Object {
-            Write-Host "$([char]27)[$($imgW)C" -NoNewline
-            Write-Host " | " -NoNewline
-            [Console]::WriteLine($_)
-        }
-
-        for ($i = 0; $i -lt ($imgH - $messages.Count); $i++) {
-            Write-Host ""
-        }
+    show_image $imgPath --width $imgW --height $imgH
+    Write-Host "$([char]27)[$($imgH)A" -NoNewline
+    $messages | ForEach-Object {
+        Write-Host "$([char]27)[$($imgW)C" -NoNewline
+        Write-Host " | " -NoNewline
+        [Console]::WriteLine($_)
     }
-    elseif ($fetchType -eq 1 -and (Get-Command ConvertTo-Sixel -ErrorAction SilentlyContinue)) {
-        $imgW = 32
-        $imgH = 16
 
-        $defaultImg = Join-Path (Join-Path $NyaDir "res") "137508504_p0_cut.png"
-        $imgPath = if ($fetchPic -ne "" -and (Test-Path $fetchPic)) { $fetchPic } else { $defaultImg }
-
-        Show-SixelImage $imgPath $imgW $imgH
-        Write-Host "$([char]27)[$($imgH)A" -NoNewline
-        $messages | ForEach-Object {
-            Write-Host "$([char]27)[$($imgW)C" -NoNewline
-            Write-Host " | " -NoNewline
-            [Console]::WriteLine($_)
-        }
-
-        for ($i = 0; $i -lt ($imgH - $messages.Count); $i++) {
-            Write-Host ""
-        }
+    for ($i = 0; $i -lt ($imgH - $messages.Count); $i++) {
+        Write-Host ""
     }
-    else {
-        $asciiPath = Join-Path (Join-Path $NyaDir "res") "ascii.txt"
-        $asciiArt = Get-Content $asciiPath -Raw -Encoding UTF8
-        $asciiLines = $asciiArt -split "`n"
-
-        $asciiMaxWidth = 0
-        foreach ($line in $asciiLines) {
-            if ($line.Length -gt $asciiMaxWidth) {
-                $asciiMaxWidth = $line.Length
-            }
-        }
-
-        $totalLines = [Math]::Max($asciiLines.Count, $messages.Count)
-        for ($i = 0; $i -lt $totalLines; $i++) {
-            $line = if ($i -lt $asciiLines.Count) { $asciiLines[$i] } else { "" }
-            $line = $line.PadRight($asciiMaxWidth)
-
-            if ($i -lt $messages.Count) {
-                $line = "$line    | $($messages[$i])"
-            }
-
-            Write-Host $line
-        }
-    }
+    
 }
