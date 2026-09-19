@@ -1,15 +1,9 @@
 function nyafetch {
-    $fetchType = 0
     $fetchPic = ""
-    $fetchText = ""
 
     if ($NyaConfig -and $NyaConfig.nyafetch) {
-        $fetchType = $NyaConfig.nyafetch.type
-        if (-not $fetchType) { $fetchType = 0 }
         $fetchPic = $NyaConfig.nyafetch.pic
         if (-not $fetchPic) { $fetchPic = "" }
-        $fetchText = $NyaConfig.nyafetch.text
-        if (-not $fetchText) { $fetchText = "" }
     }
 
     if ($isWin) {

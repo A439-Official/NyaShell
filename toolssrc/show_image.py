@@ -1,4 +1,5 @@
-import argparse, sys
+import argparse
+import sys
 
 from blessed import Terminal
 from PIL import Image
@@ -56,30 +57,52 @@ def _quantize(img, max_colors):
 
 def encode_sixel(img, max_colors=256):
     colors, idx, w, h = _quantize(img, max_colors)
-    out = ["\x1bPq", f'"1;1;{w};{h}']
+
+    if w <= 0 or h <= 0:
+        return ""
+
+    if h % 6 != 0:
+        new_h = h - (h % 6)
+        if new_h <= 0:
+            new_h = 6
+        if new_h != h:
+            img = img.resize((w, new_h), Image.LANCZOS)
+            colors, idx, w, h = _quantize(img, max_colors)
+    out = [
+        "\x1bPq",
+        f'"1;1;{w};{h}',
+    ]
 
     for i, (r, g, b) in enumerate(colors):
-        out.append(f"#{i};2;{r * 100 // 255};{g * 100 // 255};{b * 100 // 255}")
+        out.append(f"#{i};2;" f"{r * 100 // 255};" f"{g * 100 // 255};" f"{b * 100 // 255}")
 
     for y in range(0, h, 6):
-        bh = min(6, h - y)
         masks = {}
 
-        for dy in range(bh):
+        for dy in range(6):
             row = (y + dy) * w
             bit = 1 << dy
             for x in range(w):
                 c = idx[row + x]
                 if c not in masks:
-                    masks[c] = [0] * w
+                    masks[c] = bytearray(w)
                 masks[c][x] |= bit
 
-        for i, c in enumerate(sorted(masks)):
-            out.append(("" if i == 0 else "$") + f"#{c}" + _rle(masks[c]))
+        first_color = True
 
-        out.append("-")
+        for c in sorted(masks):
+            if not first_color:
+                out.append("$")
+            out.append(f"#{c}")
+            out.append(_rle(bytes(masks[c])))
 
-    out.append("\x1b\\")
+            first_color = False
+
+        if y + 6 < h:
+            out.append("-")
+
+    out.append("\x1b\\\n")
+
     return "".join(out)
 
 
@@ -93,7 +116,8 @@ def encode_symbols(img, max_colors=256):
     lines = []
 
     for y in range(0, h, 2):
-        fg = bg = None
+        fg = None
+        bg = None
         sb = []
         top = y * w
         bot = (y + 1) * w
@@ -103,11 +127,11 @@ def encode_symbols(img, max_colors=256):
             b = colors[idx[bot + x]]
 
             if a != fg:
-                sb.append(f"{E}[38;2;{a[0]};{a[1]};{a[2]}m")
+                sb.append(f"{E}[38;2;" f"{a[0]};{a[1]};{a[2]}m")
                 fg = a
 
             if b != bg:
-                sb.append(f"{E}[48;2;{b[0]};{b[1]};{b[2]}m")
+                sb.append(f"{E}[48;2;" f"{b[0]};{b[1]};{b[2]}m")
                 bg = b
 
             sb.append("\u2580")
@@ -121,27 +145,53 @@ def encode_symbols(img, max_colors=256):
 def _resize(img, width, height, symbols, cw, ch):
     ow, oh = img.size
 
+    if ow <= 0 or oh <= 0:
+        return img
     if symbols:
         if width is not None:
             w = width
-            h = height if height is not None else max(1, round(width * cw * oh / (ch * ow)))
+
+            if height is not None:
+                h = height
+            else:
+                h = max(1, round(width * cw * oh / (ch * ow)))
+
         elif height is not None:
             h = height
             w = max(1, round(height * ch * ow / (cw * oh)))
         else:
             return img
-        return img.resize((w, h * 2), Image.LANCZOS)
+
+        return img.resize(
+            (w, h * 2),
+            Image.LANCZOS,
+        )
 
     if width is not None:
-        pw = width * cw
-        ph = height * ch if height is not None else max(1, round(pw * oh / ow))
+        pw = max(1, width * cw)
+
+        if height is not None:
+            ph = max(1, height * ch)
+        else:
+            ph = max(1, round(pw * oh / ow))
+
     elif height is not None:
-        ph = height * ch
+        ph = max(1, height * ch)
+
         pw = max(1, round(ph * ow / oh))
     else:
         return img
 
-    return img.resize((pw, ph), Image.LANCZOS)
+    if ph >= 6:
+        ph -= ph % 6
+
+    if ph <= 0:
+        ph = 6
+
+    return img.resize(
+        (pw, ph),
+        Image.LANCZOS,
+    )
 
 
 def print_image(term, path, width=None, height=None, max_colors=256):
@@ -155,13 +205,20 @@ def print_image(term, path, width=None, height=None, max_colors=256):
         sixel = sys.stdout.isatty() and term.does_sixel(timeout=1.0)
         img = _resize(img, width, height, not sixel, cw, ch)
 
-        s = (encode_sixel if sixel else encode_symbols)(img, max_colors)
-        sys.stdout.write(s + ("" if sixel else "\n"))
+        if sixel:
+            s = encode_sixel(img, max_colors)
+            sys.stdout.write(s)
+            sys.stdout.write("\r")
+        else:
+            s = encode_symbols(img, max_colors)
+            sys.stdout.write(s)
+            if s:
+                sys.stdout.write("\n")
         sys.stdout.flush()
 
 
 def main():
-    p = argparse.ArgumentParser(description="Print an image to the terminal (Sixel or Unicode half-block).")
+    p = argparse.ArgumentParser(description=("Print an image to the terminal " "(Sixel or Unicode half-block)."))
     p.add_argument("path")
     p.add_argument("--width", "-w", type=int)
     p.add_argument("--height", "-H", type=int)
